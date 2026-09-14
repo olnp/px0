@@ -41,21 +41,22 @@ When the fetch fails (for example a file over 4 MB), `drawPreview` stores the me
 The preference persists in `localStorage` under `px0.mdPreview` and is restored in `boot()` in [`web/src/main.js`](../../web/src/main.js).
 
 ## 3. Server Rendering
+
 ### Converter Configuration
 
 `mdConverter` is a single goldmark instance built at package init:
 
 ```go
 var mdConverter = goldmark.New(
-	goldmark.WithExtensions(extension.GFM, extension.Footnote),
-	goldmark.WithParserOptions(
-		parser.WithAutoHeadingID(),
-		parser.WithASTTransformers(util.Prioritized(lineMarker{}, 100)),
-	),
-	goldmark.WithRendererOptions(
-		html.WithUnsafe(),
-		renderer.WithNodeRenderers(util.Prioritized(fenceRenderer{}, 100)),
-	),
+ goldmark.WithExtensions(extension.GFM, extension.Footnote),
+ goldmark.WithParserOptions(
+  parser.WithAutoHeadingID(),
+  parser.WithASTTransformers(util.Prioritized(lineMarker{}, 100)),
+ ),
+ goldmark.WithRendererOptions(
+  html.WithUnsafe(),
+  renderer.WithNodeRenderers(util.Prioritized(fenceRenderer{}, 100)),
+ ),
 )
 ```
 
@@ -119,6 +120,7 @@ Two cases stay plain and HTML-escaped:
 | 500    | goldmark returned an error                   |
 
 ## 4. Sanitization
+
 ### Why the Browser Treats the HTML as Untrusted
 
 The preview renders on px0's own origin. That origin also serves `/api/lsp/install` and `/api/lsp/start`, which accept a POST whose `Origin` matches the host. Script injected into the preview would pass that check. A Markdown file in any repository the reader opens is attacker-controlled input, so every byte from `/api/markdown` goes through `mdSanitize` before it touches the page.
@@ -132,10 +134,11 @@ The preview renders on px0's own origin. That origin also serves `/api/lsp/insta
 1. Remove, with all content, any element outside the HTML namespace or in `MD_DROP`: `script style iframe frame frameset object embed applet template noscript noembed svg math form textarea select option button link meta base title audio video source track canvas dialog`.
 1. Unwrap any element not in `MD_KEEP`, keeping its children in place. An `<input>` survives only as `type="checkbox"` and is forced `disabled`.
 1. Strip every attribute from kept elements, then restore only those that follow these rules:
-  - Attributes in `MD_ATTRS`: `align valign alt title lang dir width height colspan rowspan start reversed open checked disabled type data-line data-lang`.
-  - `id`, and `name` on `<a>`, rewritten as `id="md-<value>"`. A heading called "Status" becomes `md-status` and cannot shadow the status bar's `#status`.
-  - Class tokens only when they are `md-code`, start with `footnote`, or are highlighter tokens on `<i>`. Content cannot borrow px0's layout classes such as `row`.
-  - `src` and `href` through the URL rules below.
+
+- Attributes in `MD_ATTRS`: `align valign alt title lang dir width height colspan rowspan start reversed open checked disabled type data-line data-lang`.
+- `id`, and `name` on `<a>`, rewritten as `id="md-<value>"`. A heading called "Status" becomes `md-status` and cannot shadow the status bar's `#status`.
+- Class tokens only when they are `md-code`, start with `footnote`, or are highlighter tokens on `<i>`. Content cannot borrow px0's layout classes such as `row`.
+- `src` and `href` through the URL rules below.
 
 The cleaned children move into a `DocumentFragment` with `document.adoptNode`. The cleaned tree is never serialized and re-parsed, which rules out mutation XSS from parser round trips. `style` attributes never survive, so content cannot position an overlay over the UI.
 
@@ -244,17 +247,26 @@ Hover cards, Ctrl+click definitions and the selection bar listen on `#viewport`.
 
 - Files over 4 MB are not previewed.
 - Fences over 256 KB and fences without a language are not highlighted.
-- Mermaid diagrams and math render as code blocks.
+- Mermaid diagrams and math are rendered by the browser: `web/src/mermaid.js` swaps ` ```mermaid ` fences for diagrams, and KaTeX draws `span.md-math` spans (marked server-side by `mathParser` in `markdown.go`, including ` ```math ` fences). Both libraries are vendored under `web/lib/` and load only when a document contains a diagram or math; see [mermaid.md](mermaid.md) and "Math rendering" below.
 - The preview does not reload when the file changes on disk. Close and reopen the tab.
 - Images that load after a scroll position is restored can push content down.
 - Relative images in a Markdown file outside the workspace (opened through a language server) do not load, because `/api/raw` accepts only workspace paths.
 - The selection bar and right-click menu actions (Copy Ref, Copy with Context, Edit Inline, Find Usages) do not act on text selected in the preview. Switch to Source to edit.
 
-## 11. Tests
+## 12. Math rendering
+
+`mathParser` in `markdown.go` is a goldmark inline parser triggered by `$`. It follows GitHub's rules: the character after the opening delimiters may not be whitespace, the character before the closing delimiters may not be whitespace, and a single `$` inside `$$...$$` does not close it. goldmark's escape parser consumes `\$` before the trigger fires, so an escaped dollar never opens math, and code spans and fences are never entered, so a `$` inside backticks stays literal. The parser emits a `mathSpan` node carrying the raw TeX and whether it came from `$$` or a ` ```math ` fence; the renderer escapes the TeX into `<span class="md-math">` (plus `md-math-display` for display math) and the browser's KaTeX renders it with `throwOnError: false`, so a bad expression paints red instead of blanking the document.
+
+## 13. Vendored libraries
+
+`scripts/vendor-mermaid.sh` (Mermaid 11.17.2) and `scripts/vendor-katex.sh` (KaTeX 0.16.47) download sha256-pinned npm tarballs and extract the ES module, stylesheet and fonts into `web/lib/<library>/<version>/`. The version directory makes the tree immutable, which lets the server answer `/static/lib/` with `Cache-Control: public, max-age=31536000, immutable` while every other response stays `no-store`. `web/src/mermaid.js` and `renderMath` in `web/src/markdown.js` import the modules through a computed dynamic `import()` the bundler cannot follow, so none of the multi-megabyte libraries reach `web/app.js`, and a preview without diagrams or math fetches none of them. The Mermaid theme follows the active px0 theme's dark/light intent (`color-scheme`, falling back to `--bg` luminance) and re-renders when `html[data-theme]` changes; a diagram that fails to parse or render is replaced back by its fenced source with a note naming the fence's line.
+
+## 14. Tests
 
 [`markdown_test.go`](../../markdown_test.go) covers the server side:
 
 - `TestMarkdownPreview` checks heading ids and `data-line`, highlighted fenced code, preserved relative links, task list checkboxes, the `markdown` flag on `/api/file`, and the 415 and 400 responses.
+- `TestMathSpans` checks inline and display math, ` ```math ` fences, GitHub delimiter rules (whitespace, `\$` escapes, code spans) and that a ` ```mermaid ` fence survives as a code block.
 - `TestHeadingIDsFollowGitHub` checks the id rules and deduplication.
 
 The sanitizer, link routing, position sync and switch run only in a browser and have no automated test in the repository.

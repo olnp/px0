@@ -923,6 +923,14 @@ body.word-wrap .c { white-space: pre-wrap; word-break: break-word; overflow-wrap
 .lightbox-canvas.bg-checker { background: repeating-conic-gradient(var(--bg3) 0 25%, var(--bg2) 0 50%) 0 0/16px 16px; }
 .lightbox-canvas img { max-width: 86vw; max-height: calc(85vh - 66px); object-fit: contain; display: block; }
 
+/* Mermaid diagram: takes the block's place, bounded to the preview column. */
+.md .md-mermaid { margin: 0 0 16px; display: flex; justify-content: center; }
+.md .md-mermaid-svg { max-width: 100%; overflow: hidden; }
+.md .md-mermaid-svg svg { max-width: 100%; height: auto; display: block; }
+.md .md-mermaid-note { display: block; margin: -8px 0 16px; font-size: 12px; color: var(--faint); }
+/* Math: inline spans stay inline; display math takes the block's place. */
+.md .md-math-display { display: block; margin: 1em 0; text-align: center; overflow-x: auto; }
+.md .katex { font-size: 1.1em; color: var(--fg); }
 
 #empty { position: absolute; inset: 0; display: grid; place-items: center; background: var(--bg); }
 .empty-inner { text-align: center; color: var(--faint); }

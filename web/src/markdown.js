@@ -1,6 +1,7 @@
 // web/src/markdown.js
 import { $, $$, S, doc_, api, isMac, MOD, LH } from './state.js';
 import { vp, rowsEl, copyToClipboard, showToast } from './ui.js';
+import { renderMermaidBlocks } from './mermaid.js';
 import { render, paint, rowFor, markNodes } from './renderer.js';
 import { openFile } from './tabs.js';
 import { updateStatus } from './status.js';
@@ -60,8 +61,10 @@ async function drawPreview(d) {
     if (gen !== mdGen || mdShown !== d) return;
   }
   mdArticle.replaceChildren(mdSanitize(d.mdHtml, d.path));
+  renderMermaidBlocks(mdArticle); // before mdEnhance: a diagram must not become a code block
   mdEnhance();
   mdDrawn = d;
+  renderMath(mdArticle);
   const target = d.mdAnchor && mdFindAnchor(d.mdAnchor);
   if (target) mdScrollTo(target);
   else if (d.mdLine) previewLine(d.mdLine);
@@ -86,7 +89,7 @@ export function togglePreview() {
     mdSetPref(true);
     syncPreview();
   }
-  if (!findbar.hidden) runFind(); else S.find = null;
+  if (findbar.hidden) S.find = null; else runFind();
   render();
   updateStatus();
 }
@@ -141,7 +144,8 @@ function mdSanitize(html, docPath) {
     if (id) el.id = 'md-' + id;
     if (attrs.class) {
       const keep = attrs.class.split(/\s+/).filter(c =>
-        c === 'md-code' || c.startsWith('footnote') || (tag === 'i' && MD_TOKENS.has(c)));
+        c === 'md-code' || c === 'md-math' || c === 'md-math-display' ||
+        c.startsWith('footnote') || (tag === 'i' && MD_TOKENS.has(c)));
       if (keep.length) el.className = keep.join(' ');
     }
     if (tag === 'input') el.disabled = true;
@@ -212,6 +216,53 @@ function mdSetLink(a, href, base) {
 }
 
 /* ---------- presentation ---------- */
+
+
+/* ---------- math rendering (KaTeX) ---------- */
+
+/* Keep in lockstep with scripts/vendor-katex.sh. The version directory keeps
+   the immutable /static/lib/ caching safe across KaTeX upgrades. */
+const KATEX_VERSION = '0.16.47';
+const KATEX_URL = '/static/lib/katex/' + KATEX_VERSION + '/katex.mjs';
+const KATEX_CSS = '/static/lib/katex/' + KATEX_VERSION + '/katex.min.css';
+
+let katexPromise = null; // the module; the stylesheet link is loaded alongside
+
+function loadKatex() {
+  if (!katexPromise) {
+    const u = KATEX_URL;
+    if (!document.querySelector('link[href="' + KATEX_CSS + '"]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = KATEX_CSS;
+      document.head.appendChild(link);
+    }
+    katexPromise = import(u).then(mod => mod.default || mod)
+      .catch(err => { katexPromise = null; throw err; });
+  }
+  return katexPromise;
+}
+
+/* The server leaves the TeX escaped in md-math spans; KaTeX owns the errors
+   (throwOnError false paints the source in red instead of throwing), so one
+   bad expression never blanks a document. */
+async function renderMath(root) {
+  const spans = $$('span.md-math', root);
+  if (!spans.length) return; // no math: KaTeX is never fetched
+  let katex;
+  try {
+    katex = await loadKatex();
+  } catch {
+    for (const s of spans) s.title = 'KaTeX failed to load';
+    return;
+  }
+  for (const s of spans) {
+    if (!s.isConnected || !mdArticle.contains(s)) continue;
+    try {
+      katex.render(s.textContent, s, { displayMode: s.classList.contains('md-math-display'), throwOnError: false });
+    } catch {}
+  }
+}
 
 const MD_ALERTS = { note: 'Note', tip: 'Tip', important: 'Important', warning: 'Warning', caution: 'Caution' };
 

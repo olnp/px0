@@ -48,11 +48,12 @@ var mdConverter = goldmark.New(
 	goldmark.WithExtensions(extension.GFM, extension.Footnote),
 	goldmark.WithParserOptions(
 		parser.WithAutoHeadingID(),
+		parser.WithInlineParsers(util.Prioritized(mathParser{}, 500)),
 		parser.WithASTTransformers(util.Prioritized(lineMarker{}, 100)),
 	),
 	goldmark.WithRendererOptions(
 		html.WithUnsafe(),
-		renderer.WithNodeRenderers(util.Prioritized(fenceRenderer{}, 100)),
+		renderer.WithNodeRenderers(util.Prioritized(fenceRenderer{}, 100), util.Prioritized(mathRenderer{}, 100)),
 	),
 )
 
@@ -65,6 +66,97 @@ func renderMarkdown(src []byte) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+/* ---------- math ($...$, $$...$$, ```math) ---------- */
+
+// Math is not converted on the server: KaTeX runs in the browser, so the
+// server only marks where the math is. A mathSpan renders as a span the
+// browser recognises (md-math); the content stays escaped TeX. Delimiters
+// follow GitHub's rules: the opener is not followed by whitespace, the
+// closer is not preceded by whitespace, and \$ never opens math (goldmark's
+// escape parser consumes it first). Code spans and fences are never entered,
+// so a $ inside backticks stays literal.
+type mathSpan struct {
+	ast.BaseInline
+	Source  []byte
+	Display bool
+}
+
+var kindMathSpan = ast.NewNodeKind("MathSpan")
+
+func (n *mathSpan) Kind() ast.NodeKind { return kindMathSpan }
+
+func (n *mathSpan) Dump(source []byte, level int) {
+	ast.DumpHelper(n, source, level, nil, nil)
+}
+
+type mathParser struct{}
+
+func (mathParser) Trigger() []byte { return []byte{'$'} }
+
+func (mathParser) Parse(parent ast.Node, block text.Reader, pc parser.Context) ast.Node {
+	line, _ := block.PeekLine()
+	delims := 1
+	if len(line) > 1 && line[1] == '$' {
+		delims = 2
+	}
+	if len(line) < delims*2 {
+		return nil
+	}
+	// The opener is immediately followed by whitespace: plain text, as in
+	// "pay $5 at the $ booth". Same rule on the closing side below.
+	if util.IsSpace(line[delims]) {
+		return nil
+	}
+	end := -1
+	for i := delims; i < len(line); i++ {
+		if line[i] == '\\' {
+			i++ // escaped character, including \$
+			continue
+		}
+		if line[i] != '$' {
+			continue
+		}
+		j := i
+		for j < len(line) && line[j] == '$' && j-i < delims {
+			j++
+		}
+		if j-i != delims {
+			continue // a single $ inside $$...$$, or the reverse
+		}
+		if util.IsSpace(line[i-1]) {
+			break // closer preceded by whitespace: never closes
+		}
+		end = i
+		break
+	}
+	if end < 0 {
+		return nil
+	}
+	block.Advance(end + delims)
+	return &mathSpan{Source: line[delims:end], Display: delims == 2}
+}
+
+type mathRenderer struct{}
+
+func (mathRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
+	reg.Register(kindMathSpan, renderMathSpan)
+}
+
+func renderMathSpan(w util.BufWriter, src []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
+	if !entering {
+		return ast.WalkContinue, nil
+	}
+	m := n.(*mathSpan)
+	w.WriteString(`<span class="md-math`)
+	if m.Display {
+		w.WriteString(` md-math-display`)
+	}
+	w.WriteString(`">`)
+	w.Write(util.EscapeHTML(m.Source))
+	w.WriteString(`</span>`)
+	return ast.WalkContinue, nil
 }
 
 // headingIDs makes anchors the way GitHub does, so a table of contents written
@@ -157,6 +249,10 @@ func renderFence(w util.BufWriter, src []byte, n ast.Node, entering bool) (ast.W
 	if f, ok := n.(*ast.FencedCodeBlock); ok {
 		lang = string(f.Language(src))
 	}
+	if lang == "math" {
+		renderMathFence(w, src, n)
+		return ast.WalkSkipChildren, nil
+	}
 	var code strings.Builder
 	for i := 0; i < n.Lines().Len(); i++ {
 		seg := n.Lines().At(i)
@@ -177,6 +273,25 @@ func renderFence(w util.BufWriter, src []byte, n ast.Node, entering bool) (ast.W
 	w.WriteString(highlightFence(strings.TrimSuffix(code.String(), "\n"), lang))
 	w.WriteString("</code></pre>\n")
 	return ast.WalkSkipChildren, nil
+}
+
+// renderMathFence emits a ```math block as display math for the browser,
+// keeping the source-line anchor the code blocks carry.
+func renderMathFence(w util.BufWriter, src []byte, n ast.Node) {
+	var code strings.Builder
+	for i := range n.Lines().Len() {
+		seg := n.Lines().At(i)
+		code.Write(seg.Value(src))
+	}
+	w.WriteString(`<span class="md-math md-math-display"`)
+	if v, ok := n.AttributeString("data-line"); ok {
+		if s, ok := v.(string); ok {
+			w.WriteString(` data-line="` + s + `"`)
+		}
+	}
+	w.WriteString(`>`)
+	w.Write(util.EscapeHTML([]byte(strings.TrimSuffix(code.String(), "\n"))))
+	w.WriteString(`</span>`)
 }
 
 // highlightFence colours a block whose fence names a language chroma knows.

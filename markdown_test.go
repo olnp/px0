@@ -56,3 +56,42 @@ func TestHeadingIDsFollowGitHub(t *testing.T) {
 		}
 	}
 }
+
+func TestMathSpans(t *testing.T) {
+	for _, c := range []struct {
+		in, want string
+	}{
+		{"$E=mc^2$", `<span class="md-math">E=mc^2</span>`},
+		{"$$\\int_0^1 x\\,dx$$", `<span class="md-math md-math-display">\int_0^1 x\,dx</span>`},
+		{"pay $5 at the $ booth", "pay $5 at the $ booth"},
+		{"\\$5 and $x$", "$5 and"},
+		{"`$x$`", "<code>$x$</code>"},
+		{"$x is 5 dollars", "$x is 5 dollars"},
+		{"$a$ and $b$", `<span class="md-math">a</span> and <span class="md-math">b</span>`},
+	} {
+		out, err := renderMarkdown([]byte(c.in))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out, c.want) {
+			t.Errorf("%q: got %s, want it to contain %q", c.in, out, c.want)
+		}
+	}
+	out, err := renderMarkdown([]byte("```math\n\\frac{a}{b}\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `<span class="md-math md-math-display" data-line="2">\frac{a}{b}</span>`) {
+		t.Errorf("math fence: got %s", out)
+	}
+	if strings.Contains(out, "<pre") {
+		t.Errorf("math fence rendered as code: %s", out)
+	}
+	out, err = renderMarkdown([]byte("```mermaid\nflowchart TD\nA-->B\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `data-lang="mermaid"`) {
+		t.Errorf("mermaid fence lost: %s", out)
+	}
+}

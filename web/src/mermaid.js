@@ -142,9 +142,12 @@ async function renderTarget(target) {
   } catch (err) { fail(target, src, err); return; }
   // Mermaid runs at securityLevel strict (it DOMPurifies labels itself); this
   // is defence in depth: parse inert, drop scripts and event handlers, then
-  // adopt the tree. Nothing is serialised or re-parsed.
-  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
-  if (doc.documentElement.localName === 'svg' && !doc.querySelector('parsererror')) {
+  // adopt the tree. The parse is HTML, not XML: labels live in foreignObject
+  // and use HTML void tags (<br>), which strict XML rejects as a tag
+  // mismatch. A DOMParser document runs no script and loads nothing.
+  const doc = new DOMParser().parseFromString(svg, 'text/html');
+  const root = doc.querySelector('svg');
+  if (root) {
     for (const el of [...doc.querySelectorAll('*')]) {
       if (el.localName === 'script' || el.namespaceURI === 'http://www.w3.org/2000/xhtml' && el.localName === 'iframe') {
         el.remove();
@@ -156,7 +159,7 @@ async function renderTarget(target) {
     }
     const holder = document.createElement('div');
     holder.className = 'md-mermaid-svg';
-    holder.appendChild(document.adoptNode(doc.documentElement));
+    holder.appendChild(document.adoptNode(root));
     target.replaceWith(holder);
   } else {
     fail(target, src, new Error('render produced no SVG'));

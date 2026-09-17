@@ -34,7 +34,7 @@ mermaidPromise = import(MERMAID_URL);
 
 The import happens only when a preview actually contains `pre[data-lang="mermaid"]`, so a document without diagrams downloads no Mermaid bytes. The vendored tree is immutable (`scripts/vendor-mermaid.sh` pins a sha256-verified npm tarball), which lets the server answer `/static/lib/` with `Cache-Control: public, max-age=31536000, immutable` while every other response stays `no-store`. One browser fetches the multi-megabyte library once, across sessions.
 
-Diagrams draw as soon as the preview is shown, in order, through one queue (`render()` is not reentrant). A preview is capped at 50 diagrams and 2,000 source characters per diagram; beyond that the fence stays as source with a note. Rendering runs under Mermaid's `strict` security level.
+Diagrams draw as soon as the preview is shown, in order, through one queue (`render()` is not reentrant). A preview is capped at 50 diagrams and 50,000 source characters per diagram (the latter matches Mermaid's own `maxTextSize` parse limit, so px0's note always fires before a Mermaid parse failure would); beyond that the fence stays as source with a note. Rendering runs under Mermaid's `strict` security level.
 
 ## Theming
 

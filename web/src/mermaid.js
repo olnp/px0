@@ -12,8 +12,7 @@ const MERMAID_URL = '/static/lib/mermaid/' + MERMAID_VERSION + '/mermaid.esm.min
 
 /* Hard caps: over-cap blocks stay readable as source with a short note. */
 const MAX_BLOCKS = 50;
-const MAX_CHARS = 2000;
-
+const MAX_CHARS = 50000;
 let mermaidPromise = null;           // in-flight/finished import: mermaid loads once
 let mermaidModule = null;            // resolved module, for theme re-initialize
 let renderQueue = Promise.resolve(); // diagrams render one at a time

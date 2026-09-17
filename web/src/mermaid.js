@@ -319,8 +319,14 @@ function lightbox(svg, opener) {
   x.title = 'Close';
   x.setAttribute('aria-label', 'Close');
   scrim.append(stage, hint, x);
+  // A drag ends in a browser-synthesized click on the stage; only a press
+  // that stayed put closes the lightbox.
+  let downX = 0, downY = 0;
+  scrim.addEventListener('pointerdown', e => { downX = e.clientX; downY = e.clientY; });
   scrim.addEventListener('click', e => {
-    if (e.target === scrim || e.target === stage) close();
+    if (e.target !== scrim && e.target !== stage) return;
+    if (Math.hypot(e.clientX - downX, e.clientY - downY) > 4) return;
+    close();
   });
   document.body.append(scrim);
 

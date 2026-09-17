@@ -933,7 +933,7 @@ body.word-wrap .c { white-space: pre-wrap; word-break: break-word; overflow-wrap
 .md .md-mermaid-tools { position: absolute; top: 6px; right: 6px; z-index: 5; display: flex; gap: 4px; padding: 3px; border-radius: 5px; opacity: 0; transition: opacity .12s; }
 .md .md-mermaid:hover .md-mermaid-tools, .md-mermaid-tools:focus-within { opacity: 1; }
 .md .md-mermaid-tb {
-  width: 24px; height: 24px; border-radius: 4px; display: grid; place-items: center;
+  min-width: 24px; width: auto; height: 24px; padding: 0 4px; border-radius: 4px; display: grid; place-items: center;
   color: var(--dim); background: var(--bg3); border: 1px solid var(--line); font: 12px var(--mono);
 }
 .md .md-mermaid-tb:hover, .md .md-mermaid-tb:focus-visible { color: var(--fg); border-color: var(--accent); }

@@ -5,6 +5,7 @@
 // in web/lib/mermaid/ (see scripts/vendor-mermaid.sh) is imported on the first
 // diagram, so a preview without fences never fetches or parses it.
 import { trapTab } from './ui.js';
+import { anchoredScroll } from './zoom-math.js';
 
 /* Keep in lockstep with scripts/vendor-mermaid.sh. The version directory keeps
    the immutable /static/lib/ caching safe across Mermaid upgrades. */
@@ -169,6 +170,9 @@ function buildZoom(target, svg) {
     // A later column shrink (sidebar drag) promotes a small diagram; a
     // toolbar is never removed, so a zoomed diagram keeps its controls.
     new ResizeObserver(() => {
+      // A theme-switch or tab switch replaced the stage; the old observer
+      // would otherwise fire on the detached wrapper on every resize.
+      if (!target.isConnected) return;
       if (!target.querySelector('.md-mermaid-tools') && natural > target.clientWidth + 1) {
         target.append(tools(stage));
       }
@@ -200,13 +204,14 @@ function icon(paths) {
 const EXPAND = ['M6 2.5H2.5V6', 'M10 2.5h3.5V6', 'M6 13.5H2.5V10', 'M10 13.5h3.5V10'];
 
 /* Cursor-anchored zoom kernel shared by the stage and the lightbox: after the
-   content box scales by f, the point under (ax, ay) stays under it. */
+   content box scales by f, the point under (ax, ay) stays under it. The pure
+   math lives in web/src/zoom-math.js so scripts/test-anchor.mjs can assert it
+   in Node. */
 function anchorScroll(el, f, ax, ay) {
   const r = el.getBoundingClientRect();
-  const cx = (ax == null ? r.width / 2 : ax - r.left) + el.scrollLeft;
-  const cy = (ay == null ? r.height / 2 : ay - r.top) + el.scrollTop;
-  el.scrollLeft = cx * f - (ax == null ? r.width / 2 : ax - r.left);
-  el.scrollTop = cy * f - (ay == null ? r.height / 2 : ay - r.top);
+  const [x, y] = anchoredScroll(el.scrollLeft, el.scrollTop, r.left, r.top, r.width, r.height, f, ax, ay);
+  el.scrollLeft = x;
+  el.scrollTop = y;
 }
 
 /* Drag pans through native scroll; two pointers pinch-zoom through zoomAt.
@@ -304,6 +309,7 @@ function lightbox(svg, opener) {
   scrim.className = 'md-mermaid-box';
   scrim.setAttribute('role', 'dialog');
   scrim.setAttribute('aria-modal', 'true');
+  scrim.setAttribute('aria-label', 'Diagram fullscreen view');
   const stage = document.createElement('div');
   stage.className = 'md-mermaid-box-stage';
   const clone = svg.cloneNode(true);
@@ -379,6 +385,10 @@ function watchTheme() {
   });
   themeWatcher.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 }
+
+/* True while a fullscreen diagram dialog is in the DOM; shortcuts.js stands
+   down for every key while it is. */
+export const lightboxOpen = () => !!document.querySelector('.md-mermaid-box');
 
 /* Swap every mermaid fence for a wrapper before the code-block enhancer runs,
    so a diagram is never mistaken for a code block; the source stays on the

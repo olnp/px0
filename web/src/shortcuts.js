@@ -1,6 +1,7 @@
 // web/src/shortcuts.js
 import { $, $$, esc, frag, S, doc_, isMac, MOD, LH, keyCaps } from './state.js';
 import { vp, sizer, trapTab } from './ui.js';
+import { lightboxOpen } from './mermaid.js';
 import { layout, render, paint, toggleWordWrap } from './renderer.js';
 import { updateStatus } from './status.js';
 import { closeTab, switchTab, reopenClosedTab } from './tabs.js';
@@ -93,7 +94,11 @@ export function initShortcuts() {
     else if (act === 'help') showHelp();
   });
 
-  addEventListener('keydown', e => {
+  addEventListener('keydown', (e) => {
+    // The mermaid lightbox is keyboard-modal: its own window handler owns
+    // every key while open (Esc closes it, Tab is trapped inside), so the
+    // app shortcuts must not also act on the same event.
+    if (lightboxOpen()) return;
     const mod = e[MOD];
 
     if (e.key === 'Escape') {

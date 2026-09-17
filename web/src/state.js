@@ -2,6 +2,13 @@
 export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 export const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+/* Trusted markup with esc()-ed interpolations, parsed in an inert document: a
+   DOMParser document runs no script and loads nothing. */
+export const frag = html => {
+  const f = document.createDocumentFragment();
+  f.append(...new DOMParser().parseFromString(html, 'text/html').body.childNodes);
+  return f;
+};
 
 const request = async (method, path, params, opts = {}) => {
   const u = new URL(path, location.origin);
@@ -67,7 +74,7 @@ export const withKeys = text => text.replace(/\{([^}]+)\}/g, (_, combo) => keyLa
    fills key caps, and {combo} in a title is replaced. */
 export function applyKeyLabels(root = document) {
   for (const el of $$('[data-keys]', root)) el.textContent = keyLabel(el.dataset.keys);
-  for (const el of $$('[data-caps]', root)) el.innerHTML = keyCaps(el.dataset.caps);
+  for (const el of $$('[data-caps]', root)) el.replaceChildren(frag(keyCaps(el.dataset.caps)));
   for (const el of $$('[title*="{"]', root)) el.title = withKeys(el.title);
 }
 

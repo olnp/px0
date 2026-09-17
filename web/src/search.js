@@ -1,10 +1,9 @@
 // web/src/search.js
-import { $, $$, esc, api, debounce } from './state.js';
+import { $, $$, esc, frag, api, debounce } from './state.js';
 import { openFile } from './tabs.js';
 import { flashFind } from './lsp.js';
 
 export const resultsEl = $('#results');
-export let lastResults = null;
 
 let searchAbort = null;
 
@@ -22,13 +21,13 @@ export const runSearch = debounce(async () => {
   const q = qEl.value;
   if (!q.trim()) {
     cancelSearch();
-    resultsEl.innerHTML = '';
+    resultsEl.replaceChildren();
     return;
   }
   cancelSearch();
   const controller = new AbortController();
   searchAbort = controller;
-  resultsEl.innerHTML = '<div class="hint">searching…</div>';
+  resultsEl.replaceChildren(frag('<div class="hint">searching…</div>'));
   const params = {
     q, glob: $('#glob')?.value || '',
     case: $('#o-case')?.classList.contains('on') ? 1 : '',
@@ -45,16 +44,15 @@ export const runSearch = debounce(async () => {
     if (e.name === 'AbortError') return;
     if (searchAbort === controller) {
       searchAbort = null;
-      resultsEl.innerHTML = '<div class="hint">' + esc(e.message) + '</div>';
+      resultsEl.replaceChildren(frag('<div class="hint">' + esc(e.message) + '</div>'));
     }
   }
 }, 160);
 
 export function renderResults(j) {
-  lastResults = j;
   if (!resultsEl) return;
   if (!j.results || !j.results.length) {
-    resultsEl.innerHTML = '<div class="hint">No results.</div>';
+    resultsEl.replaceChildren(frag('<div class="hint">No results.</div>'));
     return;
   }
   const head = j.header || (j.total.toLocaleString() + ' result' + (j.total === 1 ? '' : 's') +
@@ -74,7 +72,7 @@ export function renderResults(j) {
     }
     html += '</div>';
   }
-  resultsEl.innerHTML = html;
+  resultsEl.replaceChildren(frag(html));
 }
 
 /* External results carry an absolute path, which is far too long for the
@@ -93,7 +91,7 @@ export function initSearch() {
       const g = resultsEl.querySelector('[data-group="' + CSS.escape(t.dataset.toggle) + '"]');
       const hidden = g.style.display === 'none';
       g.style.display = hidden ? '' : 'none';
-      $('.ar', t).innerHTML = hidden ? '&#9660;' : '&#9654;';
+      $('.ar', t).textContent = hidden ? '\u25BC' : '\u25B6';
       return;
     }
     const r = e.target.closest('.rline');

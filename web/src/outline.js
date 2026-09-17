@@ -1,5 +1,5 @@
 // web/src/outline.js
-import { $, $$, esc, S, doc_, api } from './state.js';
+import { $, $$, esc, frag, S, doc_, api } from './state.js';
 import { centerLine } from './tabs.js';
 import { render } from './renderer.js';
 import { updateStatus, setLspState } from './status.js';
@@ -8,7 +8,7 @@ import { pushHistory } from './history.js';
 export async function loadOutline() {
   const d = doc_();
   const el = $('#outline');
-  if (!d) { if (el) el.innerHTML = '<div class="hint">No file open.</div>'; return; }
+  if (!d) { if (el) el.replaceChildren(frag('<div class="hint">No file open.</div>')); return; }
   if (!d.outline) {
     try { d.outline = (await api('/api/outline', { path: d.path })).symbols || []; }
     catch { d.outline = []; }
@@ -37,8 +37,8 @@ export function drawOutline() {
   const el = $('#outline');
   const rel = $('#right-symbols-list');
   if (!d || !d.outline) {
-    if (el) el.innerHTML = '<div class="hint">No symbols found.</div>';
-    if (rel) rel.innerHTML = '<div class="hint">No symbols found.</div>';
+    if (el) el.replaceChildren(frag('<div class="hint">No symbols found.</div>'));
+    if (rel) rel.replaceChildren(frag('<div class="hint">No symbols found.</div>'));
     return;
   }
   const f = ($('#outline-filter')?.value || '').toLowerCase();
@@ -57,8 +57,8 @@ export function drawOutline() {
       '<span class="sn">' + esc(s.name) + '</span><span class="sl">' + s.line + '</span></div>').join('');
   };
 
-  if (el) el.innerHTML = renderSymHtml(syms);
-  if (rel) rel.innerHTML = renderSymHtml(rsyms);
+  if (el) el.replaceChildren(frag(renderSymHtml(syms)));
+  if (rel) rel.replaceChildren(frag(renderSymHtml(rsyms)));
 }
 
 export const KIND_LABEL = {

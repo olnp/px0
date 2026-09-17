@@ -1,6 +1,6 @@
 // web/src/selbar.js
 import { $, S, doc_, keyLabel } from './state.js';
-import { vp, copyToClipboard, showToast } from './ui.js';
+import { vp, copyToClipboard, showToast, trapTab } from './ui.js';
 import { render } from './renderer.js';
 import { findReferences } from './lsp.js';
 import { fitStatus } from './status.js';
@@ -306,7 +306,10 @@ export function initSelectionBar() {
   document.addEventListener('mousedown', e => {
     if (!menu.hidden && !menu.contains(e.target)) closeSelMenu();
   }, true);
-  addEventListener('keydown', e => { if (e.key === 'Escape') closeSelMenu(); });
+  addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeSelMenu();
+    else if (e.key === 'Tab' && !menu.hidden) trapTab(menu, e);
+  });
   addEventListener('resize', closeSelMenu);
   addEventListener('blur', closeSelMenu);
   document.addEventListener('scroll', closeSelMenu, true);

@@ -1,5 +1,5 @@
 // web/src/renderer.js
-import { $, S, doc_, api, LH, CHUNK, OVERSCAN } from './state.js';
+import { $, frag, S, doc_, api, LH, CHUNK, OVERSCAN } from './state.js';
 import { vp, sizer, rowsEl, editor } from './ui.js';
 
 export function measure() {
@@ -90,9 +90,9 @@ export function paint() {
   }
   const sel = saveSelection();
   rowsEl.style.transform = 'translateY(' + (first * LH) + 'px)';
-  rowsEl.innerHTML = html;
+  rowsEl.replaceChildren(frag(html));
   rowsEl.classList.toggle('all', S.selAll === d);
-  decorate(first, last);
+  decorate();
   if (sel) restoreSelection(sel);
   placeCaret();
 }
@@ -198,8 +198,7 @@ export function toPoint({ line, col }) {
 }
 
 /* Decorations are applied to the ~60 live rows only, never to the whole file. */
-export function decorate(first, last) {
-  const d = doc_();
+export function decorate() {
   if (S.occ) {
     for (const row of rowsEl.children) markNodes($('.c', row), S.occ, true, 'occ');
   }
@@ -217,7 +216,6 @@ export function decorate(first, last) {
       if (act && act.line === n && marks[act.n]) marks[act.n].classList.add('on');
     }
   }
-  void first; void last;
 }
 
 /* Wrap every occurrence of needle inside el, walking text nodes so the

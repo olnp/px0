@@ -4,6 +4,7 @@
 // module swaps each one for the diagram's SVG inline. The vendored ESM build
 // in web/lib/mermaid/ (see scripts/vendor-mermaid.sh) is imported on the first
 // diagram, so a preview without fences never fetches or parses it.
+import { trapTab } from './ui.js';
 
 /* Keep in lockstep with scripts/vendor-mermaid.sh. The version directory keeps
    the immutable /static/lib/ caching safe across Mermaid upgrades. */
@@ -101,22 +102,11 @@ async function parseDetail(mermaid, src) {
   return 'invalid diagram syntax';
 }
 
-/* Rebuild the server's block shape when the original node is gone. */
-function sourceBlock(src) {
-  const pre = document.createElement('pre');
-  pre.className = 'md-code';
-  pre.dataset.lang = 'mermaid';
-  const code = document.createElement('code');
-  code.textContent = src;
-  pre.appendChild(code);
-  return pre;
-}
-
 /* Put the block back exactly as the server rendered it and say what happened;
    a diagram must never vanish or blank because mermaid could not draw it. */
-function fail(target, src, err) {
+function fail(target, err) {
   rendered.delete(target);
-  const original = snapshots.get(target) || sourceBlock(src);
+  const original = snapshots.get(target);
   target.replaceWith(original);
   // Point at the fence's own source line: Mermaid counts within the diagram.
   const at = original.dataset.line ? ' (line ' + original.dataset.line + ')' : '';
@@ -130,7 +120,7 @@ async function renderTarget(target) {
 
   let mermaid;
   try { mermaid = await loadMermaid(); }
-  catch (err) { fail(target, src, err); return; }
+  catch (err) { fail(target, err); return; }
 
   let svg;
   try {
@@ -138,7 +128,7 @@ async function renderTarget(target) {
     if (!parsed) throw new Error(await parseDetail(mermaid, src));
     svg = (await mermaid.render('px0-mermaid-' + (++svgSeq), src)).svg;
     if (!svg) throw new Error('render produced no SVG');
-  } catch (err) { fail(target, src, err); return; }
+  } catch (err) { fail(target, err); return; }
   // Mermaid runs at securityLevel strict (it DOMPurifies labels itself); this
   // is defence in depth: parse inert, drop scripts and event handlers, then
   // adopt the tree. The parse is HTML, not XML: labels live in foreignObject
@@ -146,25 +136,229 @@ async function renderTarget(target) {
   // mismatch. A DOMParser document runs no script and loads nothing.
   const doc = new DOMParser().parseFromString(svg, 'text/html');
   const root = doc.querySelector('svg');
-  if (root) {
-    for (const el of [...doc.querySelectorAll('*')]) {
-      if (el.localName === 'script' || el.namespaceURI === 'http://www.w3.org/2000/xhtml' && el.localName === 'iframe') {
-        el.remove();
-        continue;
-      }
-      for (const a of [...el.attributes]) {
-        if (/^on/i.test(a.name) || /^javascript:/i.test(a.value.replace(/[\t\n\r ]/g, ''))) el.removeAttribute(a.name);
-      }
+  if (!root) { fail(target, new Error('render produced no SVG')); return; }
+  for (const el of [...doc.querySelectorAll('*')]) {
+    if (el.localName === 'script' || el.namespaceURI === 'http://www.w3.org/2000/xhtml' && el.localName === 'iframe') {
+      el.remove();
+      continue;
     }
-    const holder = document.createElement('div');
-    holder.className = 'md-mermaid-svg';
-    holder.appendChild(document.adoptNode(root));
-    target.replaceWith(holder);
-  } else {
-    fail(target, src, new Error('render produced no SVG'));
-    return;
+    for (const a of [...el.attributes]) {
+      if (/^on/i.test(a.name) || /^javascript:/i.test(a.value.replace(/[\t\n\r ]/g, ''))) el.removeAttribute(a.name);
+    }
   }
+  target.replaceChildren(); // a re-render (theme switch) replaces the previous stage
+  buildZoom(target, document.adoptNode(root));
   rendered.add(target);
+}
+
+/* The wrapper stays: the SVG goes into a scrollable stage inside it, so the
+   diagram can grow past the column once zoomed, and the wrapper hosts the
+   hover toolbar. Zoom resizes the SVG box (width from the viewBox), never a
+   transform: real layout keeps native scrolling and drag-pan honest. */
+function buildZoom(target, svg) {
+  const stage = document.createElement('div');
+  stage.className = 'md-mermaid-svg';
+  stage.appendChild(svg);
+  target.append(stage);
+  // The SVG carries its natural size in the viewBox; laid out it never
+  // overflows (Mermaid fits it with width:100%), so compare against that.
+  // The wrapper, not the stage, holds the preview column's width.
+  const natural = svg.viewBox.baseVal.width;
+  if (natural > target.clientWidth + 1) target.append(tools(stage));
+  else if (natural > 1) {
+    // A later column shrink (sidebar drag) promotes a small diagram; a
+    // toolbar is never removed, so a zoomed diagram keeps its controls.
+    new ResizeObserver(() => {
+      if (!target.querySelector('.md-mermaid-tools') && natural > target.clientWidth + 1) {
+        target.append(tools(stage));
+      }
+    }).observe(target);
+  }
+}
+
+const ZOOM_MAX = 8;
+
+/* Toolbar icons are built as DOM, never parsed from strings: the stage already
+   went through the inert-document scrub, the toolbar does not get a parser. */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function icon(paths) {
+  const s = document.createElementNS(SVG_NS, 'svg');
+  s.setAttribute('viewBox', '0 0 16 16');
+  s.setAttribute('width', '12');
+  s.setAttribute('height', '12');
+  s.setAttribute('fill', 'none');
+  s.setAttribute('stroke', 'currentColor');
+  s.setAttribute('stroke-width', '1.4');
+  s.setAttribute('stroke-linejoin', 'round');
+  for (const d of paths) {
+    const p = document.createElementNS(SVG_NS, 'path');
+    p.setAttribute('d', d);
+    s.appendChild(p);
+  }
+  return s;
+}
+const EXPAND = ['M6 2.5H2.5V6', 'M10 2.5h3.5V6', 'M6 13.5H2.5V10', 'M10 13.5h3.5V10'];
+
+/* Cursor-anchored zoom kernel shared by the stage and the lightbox: after the
+   content box scales by f, the point under (ax, ay) stays under it. */
+function anchorScroll(el, f, ax, ay) {
+  const r = el.getBoundingClientRect();
+  const cx = (ax == null ? r.width / 2 : ax - r.left) + el.scrollLeft;
+  const cy = (ay == null ? r.height / 2 : ay - r.top) + el.scrollTop;
+  el.scrollLeft = cx * f - (ax == null ? r.width / 2 : ax - r.left);
+  el.scrollTop = cy * f - (ay == null ? r.height / 2 : ay - r.top);
+}
+
+/* Drag pans through native scroll; two pointers pinch-zoom through zoomAt.
+   can() gates when the gesture is live; the surface sets touch-action: none
+   in CSS. */
+function gestures(el, can, zoomAt) {
+  const pts = new Map();
+  let d0 = 0;
+  el.addEventListener('pointerdown', e => {
+    if (!can() || e.button !== 0) return;
+    pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      d0 = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    }
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove', e => {
+    const prev = pts.get(e.pointerId);
+    if (!prev) return;
+    pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      const d1 = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      if (d0 > 0 && d1 > 0) zoomAt(d1 / d0, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+      d0 = d1;
+      return;
+    }
+    el.scrollLeft -= e.clientX - prev[0];
+    el.scrollTop -= e.clientY - prev[1];
+  });
+  const drop = e => { pts.delete(e.pointerId); d0 = 0; };
+  el.addEventListener('pointerup', drop);
+  el.addEventListener('pointercancel', drop);
+}
+
+/* Hover toolbar for oversized diagrams: zoom in, out, reset, fullscreen. The
+   stage wheel zooms only once zoomed in (at rest it keeps scrolling the
+   document). */
+function tools(stage) {
+  const svg = stage.querySelector('svg');
+  let z = 1;
+  const setZoom = (nz, ax, ay) => {
+    const prev = z;
+    z = Math.min(ZOOM_MAX, Math.max(1, nz));
+    if (z === 1) {
+      svg.style.width = '';
+      svg.style.maxWidth = '';
+      stage.classList.remove('md-mermaid-zoomed');
+      stage.scrollLeft = stage.scrollTop = 0;
+      return;
+    }
+    // Column width is the base the CSS fits the diagram to at rest; the
+    // zoomed class only caps the height, so clientWidth is stable.
+    svg.style.maxWidth = 'none';
+    svg.style.width = stage.clientWidth * z + 'px';
+    stage.classList.add('md-mermaid-zoomed');
+    anchorScroll(stage, z / prev, ax, ay);
+  };
+  const bar = document.createElement('div');
+  bar.className = 'md-mermaid-tools';
+  for (const [content, title, fn] of [
+    ['+', 'Zoom in', () => setZoom(z * 1.25)],
+    ['−', 'Zoom out', () => setZoom(z / 1.25)],
+    ['1:1', 'Reset zoom', () => setZoom(1)],
+    [icon(EXPAND), 'Fullscreen', () => lightbox(svg, bar.lastElementChild)],
+  ]) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'md-mermaid-tb';
+    if (typeof content === 'string') b.textContent = content;
+    else b.append(content);
+    b.title = title;
+    b.setAttribute('aria-label', title);
+    b.addEventListener('click', fn);
+    bar.append(b);
+  }
+  stage.addEventListener('wheel', e => {
+    if (z === 1) return; // at rest the wheel keeps scrolling the document
+    e.preventDefault();
+    setZoom(z * (e.deltaY < 0 ? 1.25 : 0.8), e.clientX, e.clientY);
+  }, { passive: false });
+  gestures(stage, () => z > 1, (r, x, y) => setZoom(z * r, x, y));
+  return bar;
+}
+
+/* Fullscreen lightbox: the SVG over a scrim, zoomed from its natural viewBox
+   size. Wheel and pinch zoom at any level (nothing behind the fixed layer
+   scrolls), drag pans, keys follow GitLab's enhancer, and Esc, the × button
+   or a click on the scrim closes. Tab is trapped, and focus returns to the
+   toolbar button that opened it. */
+function lightbox(svg, opener) {
+  const vb = svg.viewBox.baseVal;
+  const scrim = document.createElement('div');
+  scrim.className = 'md-mermaid-box';
+  scrim.setAttribute('role', 'dialog');
+  scrim.setAttribute('aria-modal', 'true');
+  const stage = document.createElement('div');
+  stage.className = 'md-mermaid-box-stage';
+  const clone = svg.cloneNode(true);
+  clone.removeAttribute('style'); // natural size from the viewBox, not the column fit
+  stage.appendChild(clone);
+  const hint = document.createElement('div');
+  hint.className = 'md-mermaid-box-hint';
+  hint.textContent = 'Scroll to zoom · drag to pan · 0 resets · Esc closes';
+  const x = document.createElement('button');
+  x.type = 'button';
+  x.className = 'md-mermaid-tb md-mermaid-box-x';
+  x.textContent = '\u00d7';
+  x.title = 'Close';
+  x.setAttribute('aria-label', 'Close');
+  scrim.append(stage, hint, x);
+  scrim.addEventListener('click', e => {
+    if (e.target === scrim || e.target === stage) close();
+  });
+  document.body.append(scrim);
+
+  let z = 1;
+  const setZoom = (nz, ax, ay) => {
+    if (!vb.width) return; // guard before touching state
+    const prev = z;
+    z = Math.min(ZOOM_MAX, Math.max(1, nz));
+    clone.style.width = vb.width * z + 'px';
+    clone.style.height = vb.height * z + 'px';
+    anchorScroll(stage, z / prev, ax, ay);
+  };
+  const key = e => {
+    if (e.key === 'Escape') return close();
+    if (e.key === 'Tab') return trapTab(scrim, e);
+    if (e.key === '+' || e.key === '=') return setZoom(z * 1.25);
+    if (e.key === '-') return setZoom(z / 1.25);
+    if (e.key === '0') return setZoom(1);
+    if (e.key === 'ArrowLeft') stage.scrollLeft -= 60;
+    else if (e.key === 'ArrowRight') stage.scrollLeft += 60;
+    else if (e.key === 'ArrowUp') stage.scrollTop -= 60;
+    else if (e.key === 'ArrowDown') stage.scrollTop += 60;
+    else return;
+    e.preventDefault();
+  };
+  addEventListener('keydown', key);
+  const close = () => {
+    removeEventListener('keydown', key);
+    scrim.remove();
+    if (opener && opener.isConnected) opener.focus();
+  };
+  stage.addEventListener('wheel', e => {
+    e.preventDefault(); // nothing behind the fixed layer may scroll
+    setZoom(z * (e.deltaY < 0 ? 1.25 : 0.8), e.clientX, e.clientY);
+  }, { passive: false });
+  gestures(stage, () => true, (r, ax, ay) => setZoom(z * r, ax, ay));
+  x.addEventListener('click', close);
+  x.focus();
 }
 
 function watchTheme() {
@@ -185,6 +379,7 @@ function watchTheme() {
    wrapper for a failed render to restore. */
 export function renderMermaidBlocks(root) {
   if (!root || !root.querySelectorAll) return;
+  for (const node of rendered) if (!node.isConnected) rendered.delete(node);
   const codes = root.querySelectorAll('pre[data-lang="mermaid"] > code');
   if (!codes.length) return; // no blocks: mermaid is never imported
   watchTheme();

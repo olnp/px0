@@ -1,5 +1,5 @@
 // web/src/tabs.js
-import { $, esc, S, doc_, api, LH, CHUNK, withKeys } from './state.js';
+import { $, esc, frag, S, doc_, api, LH, CHUNK, withKeys } from './state.js';
 import { vp, sizer, rowsEl, editor } from './ui.js';
 import { render, layout, refineChunk } from './renderer.js';
 import { updateStatus, setStatusNote, refreshMetrics } from './status.js';
@@ -278,7 +278,7 @@ export function closeTab(i) {
     syncImageView();
     syncPreview();
     syncDiffView();
-    rowsEl.innerHTML = ''; sizer.style.height = '0px';
+    rowsEl.replaceChildren(); sizer.style.height = '0px';
     $('#empty').hidden = false; drawCrumbs();
     drawTabs(); updateStatus();
     saveWorkspaceState();
@@ -378,7 +378,7 @@ export async function restoreWorkspaceTabs() {
 
 export function drawCrumbs() {
   const el = $('#crumbs');
-  if (el) el.innerHTML = '';
+  if (el) el.replaceChildren();
 }
 
 export function showImage(path) {
@@ -406,7 +406,7 @@ export function initTabs() {
   if (crumbsEl) {
     crumbsEl.addEventListener('click', e => {
       const c = e.target.closest('[data-dir]');
-      if (c) { showPanel('files'); revealDir(c.dataset.dir); }
+      if (c) { showPanel(); revealDir(c.dataset.dir); }
     });
   }
 }

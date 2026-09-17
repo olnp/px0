@@ -1,5 +1,5 @@
 // web/src/palette.js
-import { $, esc, S, doc_, api, debounce, withKeys } from './state.js';
+import { $, esc, frag, S, doc_, api, debounce, withKeys } from './state.js';
 import { render, toggleWordWrap } from './renderer.js';
 import { openFile, centerLine, closeTab, reopenClosedTab } from './tabs.js';
 import { updateStatus } from './status.js';
@@ -39,7 +39,7 @@ export const COMMANDS = [
     else hideRightInspector();
   } },
   { name: 'Show File Symbols (Right Panel)', run: () => showRightInspector('symbols') },
-  { name: 'Reveal Active File in Explorer', run: () => { const d = doc_(); if (d) { showPanel('files'); revealFile(d.path); } } },
+  { name: 'Reveal Active File in Explorer', run: () => { const d = doc_(); if (d) { showPanel(); revealFile(d.path); } } },
   { name: withKeys('Toggle Word Wrap ({Alt+Z})'), run: () => toggleWordWrap() },
   { name: withKeys('Toggle Markdown Preview ({Alt+M})'), run: () => togglePreview() },
   { name: withKeys('Toggle Sidebar ({Mod+B})'), run: () => document.body.classList.toggle('side-hidden') },
@@ -148,12 +148,13 @@ export function fuzzyHTML(text, pos) {
 
 export function drawPalette() {
   if (!pal) return;
-  if (!pal.items.length) { palList.innerHTML = '<div class="pi"><span class="pp">No matches</span></div>'; return; }
-  palList.innerHTML = pal.items.map((it, i) =>
+  if (!pal.items.length) { palList.replaceChildren(frag('<div class="pi"><span class="pp">No matches</span></div>')); return; }
+  const html = pal.items.map((it, i) =>
     '<div class="pi' + (i === pal.sel ? ' sel' : '') + '" data-i="' + i + '">' +
     '<span class="pn">' + (it.raw ? it.label : esc(it.label)) + '</span>' +
     '<span class="pp">' + (it.raw ? it.sub : esc(it.sub || '')) + '</span>' +
     (it.right ? '<span class="pr">' + esc(it.right) + '</span>' : '') + '</div>').join('');
+  palList.replaceChildren(frag(html));
   const s = palList.children[pal.sel];
   if (s) s.scrollIntoView({ block: 'nearest' });
   if (pal.mode === 'theme') setTheme(pal.items[pal.sel].id, false); // live preview

@@ -924,10 +924,33 @@ body.word-wrap .c { white-space: pre-wrap; word-break: break-word; overflow-wrap
 .lightbox-canvas img { max-width: 86vw; max-height: calc(85vh - 66px); object-fit: contain; display: block; }
 
 /* Mermaid diagram: takes the block's place, bounded to the preview column. */
-.md .md-mermaid { margin: 0 0 16px; display: flex; justify-content: center; }
-.md .md-mermaid-svg { max-width: 100%; overflow: hidden; }
+.md .md-mermaid { margin: 0 0 16px; position: relative; display: flex; justify-content: center; }
+.md .md-mermaid-svg { width: 100%; max-width: 100%; overflow: hidden; }
 .md .md-mermaid-svg svg { max-width: 100%; height: auto; display: block; }
+.md .md-mermaid-zoomed { max-width: none; width: 100%; height: 60vh; overflow: auto; overscroll-behavior: contain; touch-action: none; cursor: grab; }
+.md .md-mermaid-zoomed:active { cursor: grabbing; }
+.md .md-mermaid-zoomed svg { max-width: none; height: auto; display: block; }
+.md .md-mermaid-tools { position: absolute; top: 6px; right: 6px; z-index: 5; display: flex; gap: 4px; padding: 3px; border-radius: 5px; opacity: 0; transition: opacity .12s; }
+.md .md-mermaid:hover .md-mermaid-tools, .md-mermaid-tools:focus-within { opacity: 1; }
+.md .md-mermaid-tb {
+  width: 24px; height: 24px; border-radius: 4px; display: grid; place-items: center;
+  color: var(--dim); background: var(--bg3); border: 1px solid var(--line); font: 12px var(--mono);
+}
+.md .md-mermaid-tb:hover, .md .md-mermaid-tb:focus-visible { color: var(--fg); border-color: var(--accent); }
 .md .md-mermaid-note { display: block; margin: -8px 0 16px; font-size: 12px; color: var(--faint); }
+
+/* Mermaid fullscreen lightbox: natural-size diagram over a scrim. */
+.md-mermaid-box { position: fixed; inset: 0; z-index: 120; background: var(--scrim); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.md-mermaid-box-stage { position: absolute; inset: 0; overflow: auto; touch-action: none; cursor: grab; }
+.md-mermaid-box-stage:active { cursor: grabbing; }
+.md-mermaid-box-stage svg { max-width: none; display: block; margin: auto; }
+.md-mermaid-box-hint {
+  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 1;
+  font: 11px var(--mono); color: var(--dim); background: var(--bg3); border: 1px solid var(--line);
+  border-radius: 5px; padding: 4px 10px; pointer-events: none; white-space: nowrap;
+}
+.md-mermaid-box-x { position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; font-size: 15px; color: var(--dim); }
+
 /* Math: inline spans stay inline; display math takes the block's place. */
 .md .md-math-display { display: block; margin: 1em 0; text-align: center; overflow-x: auto; }
 .md .katex { font-size: 1.1em; color: var(--fg); }

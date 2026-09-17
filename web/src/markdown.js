@@ -1,5 +1,5 @@
 // web/src/markdown.js
-import { $, $$, S, doc_, api, isMac, MOD, LH } from './state.js';
+import { $, $$, frag, S, doc_, api, isMac, MOD, LH } from './state.js';
 import { vp, rowsEl, copyToClipboard, showToast } from './ui.js';
 import { renderMermaidBlocks } from './mermaid.js';
 import { render, paint, rowFor, markNodes } from './renderer.js';
@@ -278,7 +278,7 @@ function mdEnhance() {
     copy.title = 'Copy code';
     copy.setAttribute('aria-label', 'Copy code');
     // An icon, not a label: find in the preview walks text nodes.
-    copy.innerHTML = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5V3a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3v5A1.5 1.5 0 0 0 4 9.5h.5"/></svg>';
+    copy.append(frag('<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5V3a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 4 9.5h.5"/></svg>'));
     wrap.append(pre, copy);
   }
 }
@@ -373,7 +373,7 @@ async function mdFollow(path, anchor) {
   // A link to a folder reveals it in the explorer.
   try {
     await api('/api/tree', { dir: path });
-    showPanel('files');
+    showPanel();
     revealDir(path);
     return;
   } catch {}

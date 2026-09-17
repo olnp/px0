@@ -1,5 +1,5 @@
 // web/src/hover.js
-import { $, esc, S, doc_, api, isMac, MOD, withKeys } from './state.js';
+import { $, esc, frag, S, doc_, api, isMac, MOD, withKeys } from './state.js';
 import { vp, editor, copyToClipboard } from './ui.js';
 import { paint } from './renderer.js';
 import { setLspState } from './status.js';
@@ -70,7 +70,7 @@ export async function showHover(at, x, y) {
   S.hover = at;
   S.hoverAnchor = { x, y };
   const refPath = d.path + ':' + at.line;
-  hovercard.innerHTML =
+  hovercard.replaceChildren(frag(
     (j.signature ? '<div class="sig">' + j.signature + '</div>' : '') +
     (j.doc ? '<div class="doc">' + esc(j.doc) + '</div>' : '') +
     '<div class="actions">' +
@@ -81,7 +81,7 @@ export async function showHover(at, x, y) {
     '</div>' +
     '<div class="foot"><b>' + esc(j.server || 'lsp') + '</b>' +
     '<span>' + withKeys('{Mod+Click} definition') + '</span>' +
-    '<span>' + withKeys('{Shift+F12} references') + '</span></div>';
+    '<span>' + withKeys('{Shift+F12} references') + '</span></div>'));
 
   const btnRef = hovercard.querySelector('#hc-copy-ref');
   const btnAi = hovercard.querySelector('#hc-copy-ai');
@@ -136,7 +136,7 @@ export function hideHover() {
   hoverSeq++;
   S.hover = null;
   S.hoverAnchor = null;
-  if (!hovercard.hidden) { hovercard.hidden = true; hovercard.innerHTML = ''; }
+  if (!hovercard.hidden) { hovercard.hidden = true; hovercard.replaceChildren(); }
 }
 
 export function clearLink() {

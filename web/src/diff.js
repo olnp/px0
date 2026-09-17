@@ -4,7 +4,7 @@
 // side-by-side split layout (default) or a single-column unified layout.
 // Unlike the code viewport this is not virtualized -- a file's own diff is
 // bounded in size, so a plain DOM render is simple and fast enough.
-import { $, S, doc_, esc, api } from './state.js';
+import { $, frag, S, doc_, esc, api } from './state.js';
 import { syncPreview } from './markdown.js';
 import { setStatusNote, updateStatus } from './status.js';
 
@@ -245,7 +245,7 @@ function pairRows(rows) {
   while (i < rows.length) {
     const row = rows[i];
     if (row.type === 'ctx') { pairs.push({ left: row, right: row }); i++; continue; }
-    let dels = [], adds = [];
+    const dels = [], adds = [];
     while (i < rows.length && rows[i].type === 'del') dels.push(rows[i++]);
     while (i < rows.length && rows[i].type === 'add') adds.push(rows[i++]);
     const n = Math.max(dels.length, adds.length);
@@ -303,7 +303,7 @@ function markerCell(type) {
 function codeCell(text) {
   const el = document.createElement('div');
   el.className = 'diff-code';
-  el.innerHTML = esc(text || '') || '&nbsp;';
+  el.replaceChildren(frag(esc(text || '') || '&nbsp;'));
   return el;
 }
 

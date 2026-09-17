@@ -1,5 +1,5 @@
 // web/src/lspsetup.js
-import { esc, S, doc_, api, apiPost } from './state.js';
+import { esc, frag, S, doc_, api, apiPost } from './state.js';
 import { copyToClipboard, showToast } from './ui.js';
 import { setLspState, updateStatus } from './status.js';
 import { warmLSP } from './lsp.js';
@@ -26,29 +26,29 @@ export async function renderLspSetup(el, onReady) {
   const my = setupSeq;
   let s;
   try { s = await api('/api/lsp/setup', { path: d.path }); }
-  catch (e) { if (my === setupSeq) el.innerHTML = hintHtml('Could not check language servers: ' + esc(e.message)); return; }
+  catch (e) { if (my === setupSeq) el.replaceChildren(frag(hintHtml('Could not check language servers: ' + esc(e.message)))); return; }
   if (my !== setupSeq || doc_() !== d) return;
 
   const again = ms => { pollTimer = setTimeout(() => { if (my === setupSeq) renderLspSetup(el, onReady); }, ms); };
   if (s.state === 'starting' && !s.server) {
-    el.innerHTML = hintHtml('Looking for language servers…');
+    el.replaceChildren(frag(hintHtml('Looking for language servers…')));
     again(700);
     return;
   }
   // Installed (just now, or all along) but this page has not caught up: start it.
   if (s.state !== 'off' && s.state !== 'failed') { start(el, d, onReady); return; }
 
-  el.innerHTML = drawSetup(s, d);
+  el.replaceChildren(frag(drawSetup(s, d)));
   wire(el, d, onReady);
   if (s.servers.some(v => v.job && v.job.running)) again(1000);
 }
 
 async function start(el, d, onReady) {
   cancelLspSetup();
-  el.innerHTML = hintHtml('Starting the language server…');
+  el.replaceChildren(frag(hintHtml('Starting the language server…')));
   let j;
   try { j = await apiPost('/api/lsp/start', { path: d.path }); }
-  catch (e) { el.innerHTML = hintHtml('Could not start the language server: ' + esc(e.message)); return; }
+  catch (e) { el.replaceChildren(frag(hintHtml('Could not start the language server: ' + esc(e.message)))); return; }
   if (doc_() !== d) return;
   // Other open files may have been waiting on the same server: let them ask again.
   for (const t of S.tabs) {

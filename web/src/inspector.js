@@ -1,5 +1,5 @@
 // web/src/inspector.js
-import { $, $$, esc, doc_, api } from './state.js';
+import { $, $$, esc, frag, doc_, api } from './state.js';
 import { layout, render } from './renderer.js';
 import { updateStatus, setStatusNote } from './status.js';
 import { openFile, centerLine } from './tabs.js';
@@ -36,7 +36,7 @@ export function setRightInspectorTab(tab) {
   if (tab === 'search') $('#q')?.focus();
 }
 
-export function renderRightResults(word, hits, server, isExact) {
+export function renderRightResults(word, hits, server) {
   const targetEl = $('#right-ref-target');
   const badgeEl = $('#right-ref-badge');
   const listEl = $('#right-refs-list');
@@ -46,7 +46,7 @@ export function renderRightResults(word, hits, server, isExact) {
   badgeEl.textContent = hits.length;
 
   if (!hits.length) {
-    listEl.innerHTML = '<div class="hint">No references found for "<b>' + esc(word) + '</b>".</div>';
+    listEl.replaceChildren(frag('<div class="hint">No references found for "<b>' + esc(word) + '</b>".</div>'));
     return;
   }
 
@@ -68,7 +68,7 @@ export function renderRightResults(word, hits, server, isExact) {
     }
     html += '</div>';
   }
-  listEl.innerHTML = html;
+  listEl.replaceChildren(frag(html));
 }
 
 export async function inspectReferences(arg) {
@@ -82,7 +82,7 @@ export async function inspectReferences(arg) {
   const listEl = $('#right-refs-list');
   if (targetEl) targetEl.textContent = at.word;
   if (badgeEl) badgeEl.textContent = '…';
-  if (listEl) listEl.innerHTML = '<div class="hint">Finding references for "' + esc(at.word) + '"…</div>';
+  if (listEl) listEl.replaceChildren(frag('<div class="hint">Finding references for "' + esc(at.word) + '"…</div>'));
 
   if (canAskServer(at)) {
     setStatusNote('references to ' + at.word + '…', 8000);
@@ -117,7 +117,7 @@ export async function inspectReferences(arg) {
   } catch (err) {
     updateStatus();
     setStatusNote('');
-    if (listEl) listEl.innerHTML = '<div class="hint">Search error: ' + esc(err.message) + '</div>';
+    if (listEl) listEl.replaceChildren(frag('<div class="hint">Search error: ' + esc(err.message) + '</div>'));
   }
 }
 
@@ -165,7 +165,7 @@ export function initInspector() {
       if (!g) return;
       const hidden = g.style.display === 'none';
       g.style.display = hidden ? '' : 'none';
-      $('.ar', t).innerHTML = hidden ? '&#9660;' : '&#9654;';
+      $('.ar', t).textContent = hidden ? '\u25BC' : '\u25B6';
       return;
     }
     const r = e.target.closest('.rline');

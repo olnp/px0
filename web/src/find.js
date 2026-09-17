@@ -36,7 +36,7 @@ export function clearFind() {
   findbar.hidden = true;
   S.find = null;
   $('#find-count').textContent = '0';
-  $('#minimap-hits').innerHTML = '';
+  $('#minimap-hits').replaceChildren();
   clearPreviewMarks();
   paint();
 }
@@ -49,11 +49,11 @@ export const runFind = debounce(async () => {
     const n = findInPreview(q);
     S.find = q ? { q, ci: false, hits: new Array(n).fill(null), byLine: new Set(), active: n ? 0 : -1, preview: true } : null;
     $('#find-count').textContent = !q ? '0' : n ? '1 / ' + n : 'no results';
-    $('#minimap-hits').innerHTML = previewHitOffsets().map(p => '<i style="top:' + p + '%"></i>').join('');
+    drawTicks(previewHitOffsets());
     if (n) jumpToHit(0);
     return;
   }
-  if (!q) { S.find = null; $('#find-count').textContent = '0'; $('#minimap-hits').innerHTML = ''; paint(); return; }
+  if (!q) { S.find = null; $('#find-count').textContent = '0'; $('#minimap-hits').replaceChildren(); paint(); return; }
   let j;
   try { j = await api('/api/search', { q, glob: d.path }); } catch { return; }
   const f = (j.results || []).find(r => r.path === d.path);
@@ -72,12 +72,19 @@ export const runFind = debounce(async () => {
   if (hits.length) jumpToHit(0); else paint();
 }, 140);
 
+/* The minimap ticks are <i> elements positioned as percentages of the file. */
+function drawTicks(percents) {
+  $('#minimap-hits').replaceChildren(...percents.map(p => {
+    const i = document.createElement('i');
+    i.style.top = p + '%';
+    return i;
+  }));
+}
+
 export function drawMinimap(hits, total) {
-  const mm = $('#minimap-hits');
-  if (!hits.length) { mm.innerHTML = ''; return; }
   const seen = new Set();
-  mm.innerHTML = hits.filter(h => !seen.has(h.line) && seen.add(h.line))
-    .map(h => '<i style="top:' + ((h.line - 1) / total * 100).toFixed(3) + '%"></i>').join('');
+  drawTicks(hits.filter(h => !seen.has(h.line) && seen.add(h.line))
+    .map(h => ((h.line - 1) / total * 100).toFixed(3)));
 }
 
 export function jumpToHit(i) {

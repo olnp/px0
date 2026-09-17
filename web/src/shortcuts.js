@@ -1,6 +1,6 @@
 // web/src/shortcuts.js
-import { $, $$, esc, S, doc_, isMac, MOD, LH, keyCaps } from './state.js';
-import { vp, sizer } from './ui.js';
+import { $, $$, esc, frag, S, doc_, isMac, MOD, LH, keyCaps } from './state.js';
+import { vp, sizer, trapTab } from './ui.js';
 import { layout, render, paint, toggleWordWrap } from './renderer.js';
 import { updateStatus } from './status.js';
 import { closeTab, switchTab, reopenClosedTab } from './tabs.js';
@@ -57,7 +57,7 @@ export function showHelp() {
     '<button id="btn-switch-to-vim-help" class="settings-btn-link" style="margin-left:auto;font-size:12px;cursor:pointer;" title="View Vim Keybindings">View Vim Keybindings</button></div><dl class="help-grid">' +
     SHORTCUTS.map(([combos, v]) =>
       '<dt>' + combos.map(keyCaps).filter(Boolean).join('<span class="key-or">/</span>') + '</dt>' +
-      '<dd>' + esc(v) + '</dd>').join('') + '</dl></div>';
+      '<dd>' + esc(v) + '</dd>').join('') + '</dl></div>'));
   h.hidden = false;
   h.querySelector('#btn-switch-to-vim-help')?.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -112,6 +112,7 @@ export function initShortcuts() {
       if (inField(document.activeElement)) document.activeElement.blur();
       return;
     }
+    if (e.key === 'Tab' && !$('#helpsheet').hidden) { trapTab($('#helpsheet'), e); return; }
 
     if (mod && (e.key === ',' || e.key === '<')) {
       e.preventDefault();

@@ -1,5 +1,5 @@
 // web/src/calls.js
-import { $, $$, esc, S, doc_, api, keyLabel } from './state.js';
+import { $, $$, esc, frag, S, doc_, api, keyLabel } from './state.js';
 import { updateStatus, setStatusNote, setLspState } from './status.js';
 import { openFile } from './tabs.js';
 import { showRightInspector } from './inspector.js';
@@ -17,7 +17,7 @@ let callSeq = 0;
 const flat = [];    // node by row index, rebuilt on every draw
 
 const listEl = () => $('#right-calls-list');
-const hint = html => { const el = listEl(); if (el) el.innerHTML = '<div class="hint">' + html + '</div>'; };
+const hint = html => { const el = listEl(); if (el) el.replaceChildren(frag('<div class="hint">' + html + '</div>')); };
 const base = p => p.split('/').pop();
 // Some servers crash on particular call hierarchy requests; say so plainly.
 const explain = msg => /connection lost|exited|EOF/i.test(msg)
@@ -130,7 +130,7 @@ function draw() {
     if (node.open && node.kids) for (const k of node.kids) walk(k, depth + 1);
   };
   for (const r of T.roots) walk(r, 0);
-  el.innerHTML = html;
+  el.replaceChildren(frag(html));
 }
 
 // Opens the setup panel whatever the server's state, for the palette command.

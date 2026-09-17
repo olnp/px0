@@ -69,14 +69,14 @@ function updateSessionMeta(session) {
   const currentModel = chosenModel();
 
   // Populate harness select
-  session.harnessSelect.innerHTML = '';
+  session.harnessSelect.replaceChildren();
   if (!ready.length) {
     const opt = document.createElement('option');
     opt.value = '';
     opt.textContent = 'no harness';
     session.harnessSelect.appendChild(opt);
     session.harnessSelect.disabled = true;
-    session.modelSelect.innerHTML = '';
+    session.modelSelect.replaceChildren();
     session.modelSelect.hidden = true;
     return;
   }
@@ -96,7 +96,7 @@ function updateSessionMeta(session) {
 
   // Populate model select for the currently selected harness
   const activeH = ready.find(h => h.name === (session.harnessSelect.value || currentHarness)) || ready[0];
-  session.modelSelect.innerHTML = '';
+  session.modelSelect.replaceChildren();
   const models = activeH?.models || [];
   if (models.length > 0) {
     for (const m of models) {
@@ -537,7 +537,7 @@ async function showPicker(session) {
   session.composeEl.hidden = true;
   if (session.metaEl) session.metaEl.hidden = true;
   session.pickEl.hidden = false;
-  session.pickEl.innerHTML = '<div class="hint">Looking for coding harnesses…</div>';
+  session.pickEl.replaceChildren(frag('<div class="hint">Looking for coding harnesses…</div>'));
 
   let list = S.meta?.agents || [];
   let settingsPath = '';
@@ -551,21 +551,21 @@ async function showPicker(session) {
     S.meta.agentModel = j.model || '';
     S.meta.agentPinned = !!j.pinned;
   } catch (e) {
-    session.pickEl.innerHTML = '<div class="hint">Could not look for harnesses: ' + esc(e.message) + '</div>';
+    session.pickEl.replaceChildren(frag('<div class="hint">Could not look for harnesses: ' + esc(e.message) + '</div>'));
     return;
   }
 
   const ready = list.filter(h => h.installed);
   if (!ready.length) {
     showToast('!', 'Could not find any coding harness like Claude Code, OpenCode, Codex, Antigravity, Aider, etc. Install one and restart px0.', 6000);
-    session.pickEl.innerHTML = '<div class="hint" style="line-height: 1.5; padding: 4px 2px;">' +
+    session.pickEl.replaceChildren(frag('<div class="hint" style="line-height: 1.5; padding: 4px 2px;">' +
       'Could not find any coding harness like <b>Claude Code</b>, <b>OpenCode</b>, <b>Codex</b>, <b>Antigravity</b> (<code>agy</code>), <b>Aider</b>, <b>Goose</b>, <b>Gemini CLI</b>, or <b>Cursor Agent</b>.<br><br>' +
-      'Please install a coding harness, make sure it is on your <code>PATH</code>, and restart px0 after that.</div>';
+      'Please install a coding harness, make sure it is on your <code>PATH</code>, and restart px0 after that.</div>'));
     return;
   }
 
-  session.pickEl.innerHTML = '<div class="hint">This harness will edit files in this workspace.</div>' +
-    optionsHtml(ready, settingsPath);
+  session.pickEl.replaceChildren(frag('<div class="hint">This harness will edit files in this workspace.</div>' +
+    optionsHtml(ready, settingsPath)));
 
   session.pickEl.querySelectorAll('[data-pick]').forEach(b => {
     b.addEventListener('click', () => pick(session, b.dataset.pick));

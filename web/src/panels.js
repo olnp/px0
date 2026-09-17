@@ -7,7 +7,7 @@ import { treeEl, refreshTree, setSidebarMode } from './tree.js';
 import { reloadOpenTabs } from './tabs.js';
 import { showToast } from './ui.js';
 
-export function showPanel(name) {
+export function showPanel() {
   document.body.classList.remove('side-hidden');
   layout();
   render();

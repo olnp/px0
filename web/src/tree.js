@@ -1,5 +1,5 @@
 // web/src/tree.js
-import { $, $$, esc, api, apiPostJson, S } from './state.js';
+import { $, $$, esc, frag, api, apiPostJson, S } from './state.js';
 import { openFile } from './tabs.js';
 import { setStatusNote } from './status.js';
 import { showToast } from './ui.js';
@@ -17,7 +17,7 @@ const GIT_STATUS = {
 export async function drawTree(dir, container, depth) {
   let j;
   try { j = await api('/api/tree', { dir }); } catch { return; }
-  container.innerHTML = j.children.map(c => {
+  const html = j.children.map(c => {
     const pad = 8 + depth * 12;
     // Ignored by .gitignore: still browsable, dimmed, and absent from search.
     const ig = c.ignored ? ' ignored' : '';
@@ -35,6 +35,7 @@ export async function drawTree(dir, container, depth) {
     return '<div class="tr file' + ig + gc + '" data-file="' + esc(c.path) + '" style="padding-left:' + (pad + 12) + 'px" title="Open ' + esc(c.path) + note + '">' +
       '<span class="ic" data-t="' + fileKind(c.name) + '"></span><span class="nm">' + esc(c.name) + '</span>' + badge + tick + '</div>';
   }).join('');
+  container.replaceChildren(frag(html));
 }
 
 /* A colour family per file kind, drawn in CSS. Emoji or icon fonts would be at
@@ -209,10 +210,10 @@ export function updateSidebarToggleState() {
     btnChanged.classList.toggle('disabled', !hasGitChanges);
     if (!S.meta?.git) {
       btnChanged.title = 'Git not available in workspace';
-    } else if (!hasGitChanges) {
-      btnChanged.title = 'There are no git modified files.';
-    } else {
+    } else if (hasGitChanges) {
       btnChanged.title = 'Git changes (show changed files only)';
+    } else {
+      btnChanged.title = 'There are no git modified files.';
     }
   }
 }

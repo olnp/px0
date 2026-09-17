@@ -1,5 +1,6 @@
-import { $, S, doc_, api, withKeys } from './state.js';
+import { $, frag, S, doc_, api, withKeys } from './state.js';
 import { previewing } from './markdown.js';
+import { trapTab } from './ui.js';
 import { layoutPref } from './diff.js';
 
 export function updateStatus() {
@@ -119,7 +120,7 @@ let lastMetrics = null;
 
 function renderMetricsMenu(m) {
   if (!metricsMenuEl || !m) return;
-  metricsMenuEl.innerHTML = `
+  metricsMenuEl.replaceChildren(frag(`
     <div class="metrics-title">
       <span>Process Metrics</span>
       <span class="toast-chip">px0</span>
@@ -138,7 +139,7 @@ function renderMetricsMenu(m) {
         <span class="metrics-val">${m.goroutines || 0}</span>
       </div>
     </div>
-  `;
+  `));
 }
 
 export function closeMetricsMenu() {
@@ -205,6 +206,7 @@ export function initMetrics() {
   });
   addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeMetricsMenu();
+    else if (e.key === 'Tab' && metricsMenuEl && !metricsMenuEl.hidden) trapTab(metricsMenuEl, e);
   });
 }
 

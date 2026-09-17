@@ -43,6 +43,7 @@ build: web
 
 test: web
 	go test -v ./...
+	node ./scripts/test-anchor.mjs
 
 dist: web
 	@./build.sh

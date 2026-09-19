@@ -1,5 +1,5 @@
 // web/src/shortcuts.js
-import { $, $$, esc, frag, S, doc_, isMac, MOD, LH, keyCaps } from './state.js';
+import { $, esc, frag, S, doc_, isMac, MOD, LH, keyCaps } from './state.js';
 import { vp, sizer, trapTab } from './ui.js';
 import { lightboxOpen } from './mermaid.js';
 import { layout, render, paint, toggleWordWrap } from './renderer.js';
@@ -54,11 +54,11 @@ export const SHORTCUTS = [
 export function showHelp() {
   const h = $('#helpsheet');
   const ver = S.meta?.version ? ` <span class="help-version">v${esc(S.meta.version)}</span>` : '';
-  h.innerHTML = '<div class="help-card"><div class="help-header"><h2>Keyboard Shortcuts</h2>' + ver +
+  h.replaceChildren(frag('<div class="help-card"><div class="help-header"><h2>Keyboard Shortcuts</h2>' + ver +
     '<button id="btn-switch-to-vim-help" class="settings-btn-link" style="margin-left:auto;font-size:12px;cursor:pointer;" title="View Vim Keybindings">View Vim Keybindings</button></div><dl class="help-grid">' +
     SHORTCUTS.map(([combos, v]) =>
       '<dt>' + combos.map(keyCaps).filter(Boolean).join('<span class="key-or">/</span>') + '</dt>' +
-      '<dd>' + esc(v) + '</dd>').join('') + '</dl></div>';
+      '<dd>' + esc(v) + '</dd>').join('') + '</dl></div>'));
   h.hidden = false;
   h.querySelector('#btn-switch-to-vim-help')?.addEventListener('click', (e) => {
     e.stopPropagation();

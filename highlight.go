@@ -290,6 +290,23 @@ func (d *Doc) chunk(c int) ([]string, bool) {
 		lines = plainFallback(seg, to-from)
 	} else {
 		lines = d.tokenise(seg, to-from)
+		// The leading pad only helps if the lexer enters the chunk in a sane
+		// state. A string or comment token crossing the chunk-start boundary
+		// means the pad cut a construct open: the lexer then misreads the
+		// fragment (a stray quote or closer) and can poison the whole chunk.
+		// Re-lex with the context doubled, once; if the construct is longer
+		// than that too, the background pass fixes it up.
+		if from > 0 && crossesBoundary(d.lexer, seg, start-from) {
+			from2 := start - 2*hlContext
+			if from2 < 0 {
+				from2 = 0
+			}
+			if d.lineOff[to]-d.lineOff[from2] <= hlWindowBytes {
+				seg2 := d.src[d.lineOff[from2]:d.lineOff[to]]
+				lines = d.tokenise(seg2, to-from2)
+				from = from2
+			}
+		}
 	}
 	v = lines[start-from : end-from]
 
@@ -306,6 +323,24 @@ func (d *Doc) chunk(c int) ([]string, bool) {
 		cache.grow(d.key, sizeOfLines(v))
 	}
 	return v, full
+}
+
+// crossesBoundary reports whether a string or comment token spans the given
+// byte offset within an already-lexed window segment — i.e. the window's
+// leading pad cut a construct open at the point the chunk begins.
+func crossesBoundary(lexer chroma.Lexer, seg string, at int) bool {
+	if lexer == nil || at <= 0 || at >= len(seg) {
+		return false
+	}
+	it, err := lexer.Tokenise(nil, seg[:at])
+	if err != nil {
+		return false
+	}
+	var last chroma.Token
+	for t := it(); t != chroma.EOF; t = it() {
+		last = t
+	}
+	return last.Value != "" && (last.Type.InCategory(chroma.LiteralString) || last.Type.InCategory(chroma.Comment))
 }
 
 func sizeOfLines(lines []string) int {

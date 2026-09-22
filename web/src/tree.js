@@ -1,7 +1,6 @@
 // web/src/tree.js
 import { $, $$, esc, frag, api, apiPostJson, S } from './state.js';
 import { openFile } from './tabs.js';
-import { setStatusNote } from './status.js';
 import { showToast } from './ui.js';
 
 export const treeEl = $('#tree');

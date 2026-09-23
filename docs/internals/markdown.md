@@ -247,6 +247,7 @@ Hover cards, Ctrl+click definitions and the selection bar listen on `#viewport`.
 
 - Files over 4 MB are not previewed.
 - Fences over 256 KB and fences without a language are not highlighted.
+- Math is inline-only: `$...$`, `$$...$$` and ` ```math ` fences work, but a `$$` block whose TeX spans multiple lines (the common GitHub display-math style) is not recognized and renders as literal text, because `mathParser` is an inline parser scoped to a single line.
 - Mermaid diagrams and math are rendered by the browser: `web/src/mermaid.js` swaps ` ```mermaid ` fences for diagrams, and KaTeX draws `span.md-math` spans (marked server-side by `mathParser` in `markdown.go`, including ` ```math ` fences). Both libraries are vendored under `web/lib/` and load only when a document contains a diagram or math; see [mermaid.md](mermaid.md) and "Math rendering" below.
 - The preview does not reload when the file changes on disk. Close and reopen the tab.
 - Images that load after a scroll position is restored can push content down.

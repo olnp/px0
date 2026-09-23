@@ -25,7 +25,7 @@ curl -fsSL https://px0.ai/install.sh | sh
 
 ### Build from Source
 
-Requires Go 1.24+. No npm, node, CGO, or external dependencies:
+Requires Go 1.24+ and Node.js (the web bundle is built by `scripts/build-web.js`; no npm packages are installed). CGO and external Go dependencies are not required:
 
 ```bash
 git clone https://github.com/px0-ai/px0.git
